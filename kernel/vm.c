@@ -255,6 +255,44 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
   return newsz;
 }
 
+// Allocate PTEs and physical memory to grow process from oldsz to
+// newsz, which need not be page aligned.  Returns new size or 0 on error.
+uint64
+uvmalloc_kpg(pagetable_t pagetable, pagetable_t process_kpg, uint64 oldsz, uint64 newsz)
+{
+  char *mem;
+  uint64 a;
+
+  if (newsz < oldsz)
+    return oldsz;
+
+  oldsz = PGROUNDUP(oldsz);
+  for (a = oldsz; a < newsz; a += PGSIZE)
+  {
+    mem = kalloc();
+    if (mem == 0)
+    {
+      uvmdealloc(pagetable, a, oldsz);
+      uvmdealloc(process_kpg, a, oldsz);
+      return 0;
+    }
+    memset(mem, 0, PGSIZE);
+    int map1 = mappages(pagetable, a, PGSIZE, (uint64)mem, PTE_W | PTE_X | PTE_R | PTE_U);
+    int map2 = mappages(process_kpg, a, PGSIZE, (uint64)mem, PTE_W | PTE_X | PTE_R);
+    if (map1 !=0 && map2!=0)
+    {
+      kfree(mem);
+      uvmdealloc(pagetable, a, oldsz);
+      uvmdealloc(process_kpg, a, oldsz);
+      return 0;
+    }
+  }
+  return newsz;
+}
+
+
+
+
 // Deallocate user pages to bring the process size from oldsz to
 // newsz.  oldsz and newsz need not be page-aligned, nor does newsz
 // need to be less than oldsz.  oldsz can be larger than the actual
@@ -273,6 +311,30 @@ uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 
   return newsz;
 }
+
+// Deallocate user pages to bring the process size from oldsz to
+// newsz.  oldsz and newsz need not be page-aligned, nor does newsz
+// need to be less than oldsz.  oldsz can be larger than the actual
+// process size.  Returns the new process size.
+uint64
+uvmdealloc_kpg(pagetable_t pagetable, pagetable_t process_kpg, uint64 oldsz, uint64 newsz)
+{
+  if (newsz >= oldsz)
+    return oldsz;
+
+  if (PGROUNDUP(newsz) < PGROUNDUP(oldsz))
+  {
+    int npages = (PGROUNDUP(oldsz) - PGROUNDUP(newsz)) / PGSIZE;
+    uvmunmap(pagetable, PGROUNDUP(newsz), npages, 1);
+    uvmunmap(process_kpg, PGROUNDUP(newsz), npages, 1);
+  }
+
+  return newsz;
+}
+
+
+
+
 
 // Recursively free page-table pages.
 // All leaf mappings must already have been removed.
@@ -342,6 +404,53 @@ err:
   uvmunmap(new, 0, i / PGSIZE, 1);
   return -1;
 }
+
+
+// Given a parent process's page table, copy
+// its memory into a child's page table.
+// Copies both the page table and the
+// physical memory.
+// returns 0 on success, -1 on failure.
+// frees any allocated pages on failure.
+int uvmcopy_kpg(pagetable_t old, pagetable_t new, pagetable_t new_kpg, uint64 sz)
+{
+  pte_t *pte;
+  uint64 pa, i;
+  uint flags;
+  char *mem;
+
+  for (i = 0; i < sz; i += PGSIZE)
+  {
+    if ((pte = walk(old, i, 0)) == 0)
+      panic("uvmcopy: pte should exist");
+    if ((*pte & PTE_V) == 0)
+      panic("uvmcopy: page not present");
+    pa = PTE2PA(*pte);
+    flags = PTE_FLAGS(*pte);
+    if ((mem = kalloc()) == 0)
+      goto err;
+    memmove(mem, (char *)pa, PGSIZE);
+    int map1 = mappages(new, i, PGSIZE, (uint64)mem, flags); 
+    int map2 = mappages(new_kpg, i, PGSIZE, (uint64)mem, flags); 
+    if (map1 !=0 && map2 != 0)
+    {
+      kfree(mem);
+      goto err;
+    }
+  }
+  return 0;
+
+err:
+  uvmunmap(new, 0, i / PGSIZE, 1);
+  uvmunmap(new_kpg, 0, i / PGSIZE, 0);
+  return -1;
+}
+
+
+
+
+
+
 
 // mark a PTE invalid for user access.
 // used by exec for the user stack guard page.

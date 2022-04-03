@@ -277,16 +277,21 @@ int growproc(int n)
   struct proc *p = myproc();
 
   sz = p->sz;
+  if (sz + n >= PLIC)
+  {
+    return -1;
+    // limit the size of process memory in order to simplify copyin/instr
+  }
   if (n > 0)
   {
-    if ((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0)
+    if ((sz = uvmalloc_kpg(p->pagetable, p->process_kernel_pagetable, sz, sz + n)) == 0)
     {
       return -1;
     }
   }
   else if (n < 0)
   {
-    sz = uvmdealloc(p->pagetable, sz, sz + n);
+    sz = uvmdealloc_kpg(p->pagetable, p->process_kernel_pagetable, sz, sz + n);
   }
   p->sz = sz;
   return 0;
@@ -313,6 +318,9 @@ int fork(void)
     release(&np->lock);
     return -1;
   }
+
+  // add new content to the child process kernel table
+  
   np->sz = p->sz;
 
   np->parent = p;
