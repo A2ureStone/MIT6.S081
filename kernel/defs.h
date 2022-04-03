@@ -180,6 +180,9 @@ int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);
 void            vmprint(pagetable_t);
 void            vmprint_helper(pagetable_t, int);
+pagetable_t kvminit_process(); // vm.c give a clear kernel page table
+void freewalkNotLeaf(pagetable_t pagetable);
+
 
 // plic.c
 void            plicinit(void);

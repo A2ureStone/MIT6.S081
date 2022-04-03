@@ -492,3 +492,106 @@ void vmprint_helper(pagetable_t pagetable, int level)
     }
   }
 }
+
+
+/*
+ * create a direct-map clear kernel page table for the process.
+ */
+pagetable_t kvminit_process()
+{
+  uint64 va, pa, sz;
+  int perm;
+  pagetable_t process_kernel_pagetable = (pagetable_t)kalloc();
+  memset(process_kernel_pagetable, 0, PGSIZE);
+
+  // uart registers
+  // kvmmap(UART0, UART0, PGSIZE, PTE_R | PTE_W);
+  va = UART0;
+  pa = UART0;
+  sz = PGSIZE;
+  perm = PTE_R | PTE_W;
+
+  if (mappages(process_kernel_pagetable, va, sz, pa, perm) != 0)
+    panic("kvmmap");
+
+  // virtio mmio disk interface
+  // kvmmap(VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
+  va = VIRTIO0;
+  pa = VIRTIO0;
+
+  if (mappages(process_kernel_pagetable, va, sz, pa, perm) != 0)
+    panic("kvmmap");
+
+  // CLINT
+  // kvmmap(CLINT, CLINT, 0x10000, PTE_R | PTE_W);
+  va = CLINT;
+  pa = CLINT;
+  sz = 0x10000;
+
+  if (mappages(process_kernel_pagetable, va, sz, pa, perm) != 0)
+    panic("kvmmap");
+
+  // PLIC
+  // kvmmap(PLIC, PLIC, 0x400000, PTE_R | PTE_W);
+  va = PLIC;
+  pa = PLIC;
+  sz = 0x400000;
+
+  if (mappages(process_kernel_pagetable, va, sz, pa, perm) != 0)
+    panic("kvmmap");
+
+  // map kernel text executable and read-only.
+  // kvmmap(KERNBASE, KERNBASE, (uint64)etext - KERNBASE, PTE_R | PTE_X);
+  va = KERNBASE;
+  pa = KERNBASE;
+  sz = (uint64)etext - KERNBASE;
+  perm = PTE_R | PTE_X;
+
+  if (mappages(process_kernel_pagetable, va, sz, pa, perm) != 0)
+    panic("kvmmap");
+
+  // map kernel data and the physical RAM we'll make use of.
+  // kvmmap((uint64)etext, (uint64)etext, PHYSTOP - (uint64)etext, PTE_R | PTE_W);
+  va = (uint64)etext;
+  pa = (uint64)etext;
+  sz = PHYSTOP - (uint64)etext;
+  perm = PTE_R | PTE_W;
+
+  if (mappages(process_kernel_pagetable, va, sz, pa, perm) != 0)
+    panic("kvmmap");
+
+  // map the trampoline for trap entry/exit to
+  // the highest virtual address in the kernel.
+  // kvmmap(TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
+  va = TRAMPOLINE;
+  pa = (uint64)trampoline;
+  sz = PGSIZE;
+  perm = PTE_R | PTE_X;
+
+  if (mappages(process_kernel_pagetable, va, sz, pa, perm) != 0)
+    panic("kvmmap");
+
+  // finish kvminit set
+  return process_kernel_pagetable;
+}
+
+
+// Recursively free page-table pages.
+// All leaf mappings saved
+void freewalkNotLeaf(pagetable_t pagetable)
+{
+  // there are 2^9 = 512 PTEs in a page table.
+  for (int i = 0; i < 512; i++)
+  {
+    pte_t pte = pagetable[i];
+    if ((pte & PTE_V) && (pte & (PTE_R | PTE_W | PTE_X)) == 0)
+    {
+      // this PTE points to a lower-level page table.
+      uint64 child = PTE2PA(pte);
+      freewalkNotLeaf((pagetable_t)child);
+      pagetable[i] = 0;
+    }
+    // add return?
+  }
+  kfree((void *)pagetable);
+}
