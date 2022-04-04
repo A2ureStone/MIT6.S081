@@ -182,6 +182,14 @@ void            vmprint(pagetable_t);
 void            vmprint_helper(pagetable_t, int);
 pagetable_t kvminit_process(); // vm.c give a clear kernel page table
 void freewalkNotLeaf(pagetable_t pagetable);
+void freewalkNotLeaf_helper(pagetable_t pagetable, int level);
+
+
+
+void uvmunmap_kpg(pagetable_t pagetable, uint64 va, uint64 npages);
+
+int uvmcopy_upg2kpg(pagetable_t old, pagetable_t new, uint64 sz);
+int twoTableSame(pagetable_t upg, pagetable_t kpg, uint64 sz);
 
 
 // plic.c

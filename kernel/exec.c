@@ -117,6 +117,11 @@ exec(char *path, char **argv)
   proc_freepagetable(oldpagetable, oldsz);
 
   if(p->pid==1) vmprint(p->pagetable);
+  // uvmunmap_kpg(p->process_kernel_pagetable, 0, PLIC);
+  // uvmcopy_upg2kpg(p->pagetable, p->process_kernel_pagetable, PLIC);
+  // vmprint(p->process_kernel_pagetable);
+  // uvmcopy_upg2kpg(p->pagetable, p->process_kernel_pagetable, PLIC);
+  // twoTableSame(p->pagetable, p->process_kernel_pagetable, PLIC);
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:

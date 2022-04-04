@@ -455,7 +455,8 @@ int copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   }
 }
 
-void vmprint(pagetable_t pagetable) {
+void vmprint(pagetable_t pagetable)
+{
   printf("page table %p\n", pagetable);
   vmprint_helper(pagetable, 1);
 }
@@ -488,11 +489,10 @@ void vmprint_helper(pagetable_t pagetable, int level)
         printf("error happen\n");
       }
 
-      vmprint_helper((pagetable_t) child, level + 1);
+      vmprint_helper((pagetable_t)child, level + 1);
     }
   }
 }
-
 
 /*
  * create a direct-map clear kernel page table for the process.
@@ -524,12 +524,12 @@ pagetable_t kvminit_process()
 
   // CLINT
   // kvmmap(CLINT, CLINT, 0x10000, PTE_R | PTE_W);
-  va = CLINT;
-  pa = CLINT;
-  sz = 0x10000;
+  // va = CLINT;
+  // pa = CLINT;
+  // sz = 0x10000;
 
-  if (mappages(process_kernel_pagetable, va, sz, pa, perm) != 0)
-    panic("kvmmap");
+  // if (mappages(process_kernel_pagetable, va, sz, pa, perm) != 0)
+  //   panic("kvmmap");
 
   // PLIC
   // kvmmap(PLIC, PLIC, 0x400000, PTE_R | PTE_W);
@@ -575,23 +575,135 @@ pagetable_t kvminit_process()
   return process_kernel_pagetable;
 }
 
-
 // Recursively free page-table pages.
 // All leaf mappings saved
 void freewalkNotLeaf(pagetable_t pagetable)
 {
   // there are 2^9 = 512 PTEs in a page table.
+  // for (int i = 0; i < 512; i++)
+  // {
+  //   pte_t pte = pagetable[i];
+  //   if ((pte & PTE_V) && (pte & (PTE_R | PTE_W | PTE_X)) == 0)
+  //   {
+  //     // this PTE points to a lower-level page table.
+  //     uint64 child = PTE2PA(pte);
+  //     freewalkNotLeaf((pagetable_t)child);
+  //     pagetable[i] = 0;
+  //   }
+  //   // add return?
+  // }
+  // kfree((void *)pagetable);
+  freewalkNotLeaf_helper(pagetable, 1);
+}
+
+void freewalkNotLeaf_helper(pagetable_t pagetable, int level)
+{
+  // there are 2^9 = 512 PTEs in a page table.
+  if (level == 3)
+  {
+    kfree((void *)pagetable);
+    return;
+  }
   for (int i = 0; i < 512; i++)
   {
     pte_t pte = pagetable[i];
-    if ((pte & PTE_V) && (pte & (PTE_R | PTE_W | PTE_X)) == 0)
+    if (level == 1 || level == 2)
     {
-      // this PTE points to a lower-level page table.
-      uint64 child = PTE2PA(pte);
-      freewalkNotLeaf((pagetable_t)child);
-      pagetable[i] = 0;
+      if (pte & PTE_V)
+      {
+        uint64 child = PTE2PA(pte);
+        freewalkNotLeaf_helper((pagetable_t)child, level + 1);
+        pagetable[i] = 0;
+      }
     }
+    // if ((pte & PTE_V) && (pte & (PTE_R | PTE_W | PTE_X)) == 0)
+    // {
+    //   // this PTE points to a lower-level page table.
+    //   uint64 child = PTE2PA(pte);
+    //   freewalkNotLeaf((pagetable_t)child, level + 1);
+    //   pagetable[i] = 0;
+    // }
     // add return?
   }
   kfree((void *)pagetable);
+}
+
+// Given a parent process's page table, copy
+// its memory into a child's page table.
+// Copies both the page table and the
+// physical memory.
+// returns 0 on success, -1 on failure.
+// frees any allocated pages on failure.
+int uvmcopy_upg2kpg(pagetable_t old, pagetable_t new, uint64 sz)
+{
+  pte_t *pte;
+  uint64 pa, i;
+  uint flags;
+
+  for (i = 0; i < sz; i += PGSIZE)
+  {
+    if ((pte = walk(old, i, 0)) == 0)
+      continue;
+    if ((*pte & PTE_V) == 0)
+      continue;
+    pa = PTE2PA(*pte);
+    flags = PTE_FLAGS(*pte) & (!PTE_U);
+    // if ((mem = kalloc()) == 0)
+    //   goto err;
+    // memmove(mem, (char *)pa, PGSIZE);
+    mappages(new, i, PGSIZE, pa, flags);
+    printf("map va %p to pa %p\n", i, pa);
+  }
+  return 0;
+}
+
+// Remove npages of mappings starting from va. va must be
+// page-aligned. The mappings must exist.
+// Optionally free the physical memory.
+void uvmunmap_kpg(pagetable_t pagetable, uint64 va, uint64 sz)
+{
+  uint64 a;
+  pte_t *pte;
+
+  if ((va % PGSIZE) != 0)
+    panic("uvmunmap: not aligned");
+
+  for (a = va; a < va + sz; a += PGSIZE)
+  {
+    if ((pte = walk(pagetable, a, 0)) == 0)
+      continue;
+    *pte = 0;
+    // if ((*pte & PTE_V) == 0)
+    //   continue;
+    // if (PTE_FLAGS(*pte) == PTE_V)
+    //   panic("uvmunmap: not a leaf");
+  }
+}
+
+// Given a parent process's page table, copy
+// its memory into a child's page table.
+// Copies both the page table and the
+// physical memory.
+// returns 0 on success, -1 on failure.
+// frees any allocated pages on failure.
+int twoTableSame(pagetable_t upg, pagetable_t kpg, uint64 sz)
+{
+  pte_t *pte, *opte;
+  uint64 pa, opa, i;
+
+  for (i = 0; i < sz; i += PGSIZE)
+  {
+    pte = walk(upg, i, 0);
+    opte = walk(upg, i, 0);
+    if (pte != 0 && opte != 0)
+    {
+      pa = PTE2PA(*pte);
+      opa = PTE2PA(*opte);
+      if (pa != opa)
+      {
+        printf("not equal\n");
+      }
+    }
+  }
+  return 0;
 }
