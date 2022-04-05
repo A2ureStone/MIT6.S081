@@ -188,6 +188,9 @@ void freewalkNotLeaf_recur(pagetable_t pagetable, int level);
 uint64 uvmalloc_kpg(pagetable_t pagetable, pagetable_t kpg, uint64 oldsz, uint64 newsz);
 uint64 uvmdealloc_kpg(pagetable_t pagetable, pagetable_t kpg, uint64 oldsz, uint64 newsz);
 int uvmcopy_kpg(pagetable_t old, pagetable_t new, pagetable_t kpg, uint64 sz);
+void freeKpg(pagetable_t kpg); 
+void uvminit_kpg(pagetable_t pagetable, pagetable_t kpg, uchar *src, uint sz);
+int copyin_new(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len);
 
 // plic.c
 void            plicinit(void);

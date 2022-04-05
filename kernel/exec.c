@@ -21,6 +21,9 @@ exec(char *path, char **argv)
   pagetable_t pagetable = 0, oldpagetable;
   struct proc *p = myproc();
 
+  // free the user part of kpg
+  freeKpg(p->process_kernel_pagetable); 
+
   begin_op();
 
   if((ip = namei(path)) == 0){

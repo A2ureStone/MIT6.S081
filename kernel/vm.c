@@ -191,8 +191,8 @@ void uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
       panic("uvmunmap: walk");
     if ((*pte & PTE_V) == 0)
       panic("uvmunmap: not mapped");
-    if (PTE_FLAGS(*pte) == PTE_V)
-      panic("uvmunmap: not a leaf");
+    // if (PTE_FLAGS(*pte) == PTE_V)
+    //   panic("uvmunmap: not a leaf");
     if (do_free)
     {
       uint64 pa = PTE2PA(*pte);
@@ -409,6 +409,7 @@ int copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
     srcva = va0 + PGSIZE;
   }
   return 0;
+  // return copyin_new(pagetable, dst, srcva, len);
 }
 
 // Copy a null-terminated string from user to kernel.
@@ -648,7 +649,8 @@ uvmalloc_kpg(pagetable_t pagetable, pagetable_t kpg, uint64 oldsz, uint64 newsz)
     memset(mem, 0, PGSIZE);
     int map1 = mappages(pagetable, a, PGSIZE, (uint64)mem, PTE_W | PTE_X | PTE_R | PTE_U);
     int map2 = mappages(kpg, a, PGSIZE, (uint64)mem, PTE_W | PTE_X | PTE_R);
-    if (map1 != 0 && map2 != 0)
+    // int map2 = 0;
+    if (map1 != 0 || map2 != 0)
     {
       kfree(mem);
       uvmdealloc_kpg(pagetable, kpg, a, oldsz);
@@ -694,10 +696,7 @@ int uvmcopy_kpg(pagetable_t old, pagetable_t new, pagetable_t kpg, uint64 sz)
     memmove(mem, (char *)pa, PGSIZE);
     int map2 = mappages(kpg, i, PGSIZE, (uint64)mem, (flags & !PTE_U));
     int map1 = mappages(new, i, PGSIZE, (uint64)mem, flags);
-    if (new == kpg)
-    {
-      printf("table equal\n");
-    }
+
     // int map2 = 0;
     if (map1 != 0 && map2 != 0)
     {
@@ -711,4 +710,51 @@ err:
   uvmunmap(new, 0, i / PGSIZE, 1);
   uvmunmap(kpg, 0, i / PGSIZE, 0);
   return -1;
+}
+
+// void freeKpg(pagetable_t kpg)
+// {
+//   for (uint64 i = 0; i < PLIC; i += PGSIZE)
+//   {
+//     pte_t *pte = walk(kpg, i, 0);
+//     if (pte != 0 && (*pte & PTE_V))
+//     {
+//       uvmunmap(kpg, i, 1, 0);
+//     }
+//   }
+// }
+
+// Remove npages of mappings starting from va. va must be
+// page-aligned. The mappings must exist.
+// Optionally free the physical memory.
+void freeKpg(pagetable_t pagetable)
+{
+  uint64 a;
+  pte_t *pte;
+
+  for (a = 0; a < PLIC; a += PGSIZE)
+  {
+    if ((pte = walk(pagetable, a, 0)) == 0)
+      continue;
+    if ((*pte & PTE_V) == 0)
+      continue;
+    *pte = 0;
+  }
+}
+
+
+// Load the user initcode into address 0 of pagetable,
+// for the very first process.
+// sz must be less than a page.
+void uvminit_kpg(pagetable_t pagetable, pagetable_t kpg, uchar *src, uint sz)
+{
+  char *mem;
+
+  if (sz >= PGSIZE)
+    panic("inituvm: more than a page");
+  mem = kalloc();
+  memset(mem, 0, PGSIZE);
+  mappages(pagetable, 0, PGSIZE, (uint64)mem, PTE_W | PTE_R | PTE_X | PTE_U);
+  mappages(kpg, 0, PGSIZE, (uint64)mem, PTE_W | PTE_R | PTE_X);
+  memmove(mem, src, sz);
 }
