@@ -49,7 +49,7 @@ exec(char *path, char **argv)
     if(ph.vaddr + ph.memsz < ph.vaddr)
       goto bad;
     uint64 sz1;
-    if((sz1 = uvmalloc(pagetable, sz, ph.vaddr + ph.memsz)) == 0)
+    if((sz1 = uvmalloc_kpg(pagetable, p->process_kernel_pagetable, sz, ph.vaddr + ph.memsz)) == 0)
       goto bad;
     sz = sz1;
     if(ph.vaddr % PGSIZE != 0)
@@ -68,10 +68,11 @@ exec(char *path, char **argv)
   // Use the second as the user stack.
   sz = PGROUNDUP(sz);
   uint64 sz1;
-  if((sz1 = uvmalloc(pagetable, sz, sz + 2*PGSIZE)) == 0)
+  if((sz1 = uvmalloc_kpg(pagetable, p->process_kernel_pagetable, sz, sz + 2*PGSIZE)) == 0)
     goto bad;
   sz = sz1;
   uvmclear(pagetable, sz-2*PGSIZE);
+  uvmclear(p->process_kernel_pagetable, sz-2*PGSIZE);
   sp = sz;
   stackbase = sp - PGSIZE;
 
@@ -122,6 +123,8 @@ exec(char *path, char **argv)
  bad:
   if(pagetable)
     proc_freepagetable(pagetable, sz);
+  // if (p->process_kernel_pagetable)
+  //   freewalkNotLeaf(p->process_kernel_pagetable);
   if(ip){
     iunlockput(ip);
     end_op();
