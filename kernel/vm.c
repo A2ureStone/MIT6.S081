@@ -49,6 +49,8 @@ kvminit()
 
 // Switch h/w page table register to the kernel's page table,
 // and enable paging.
+
+// set the kernel page table address to satp register
 void
 kvminithart()
 {
@@ -68,6 +70,7 @@ kvminithart()
 //   21..29 -- 9 bits of level-1 index.
 //   12..20 -- 9 bits of level-0 index.
 //    0..11 -- 12 bits of byte offset within the page.
+// find the PTE for a virtual address, alloc represent install new PTE for the virtual address
 pte_t *
 walk(pagetable_t pagetable, uint64 va, int alloc)
 {
@@ -86,11 +89,14 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
     }
   }
   return &pagetable[PX(0, va)];
+  // to the low level
 }
 
 // Look up a virtual address, return the physical address,
 // or 0 if not mapped.
 // Can only be used to look up user pages.
+
+// find the pa of given va in the user page table
 uint64
 walkaddr(pagetable_t pagetable, uint64 va)
 {
@@ -125,6 +131,7 @@ kvmmap(uint64 va, uint64 pa, uint64 sz, int perm)
 // a physical address. only needed for
 // addresses on the stack.
 // assumes va is page aligned.
+
 uint64
 kvmpa(uint64 va)
 {
@@ -145,6 +152,7 @@ kvmpa(uint64 va)
 // physical addresses starting at pa. va and size might not
 // be page-aligned. Returns 0 on success, -1 if walk() couldn't
 // allocate a needed page-table page.
+// install PTE for new mapping, size is bytes length
 int
 mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
 {
@@ -157,6 +165,7 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
     if((pte = walk(pagetable, a, 1)) == 0)
       return -1;
     if(*pte & PTE_V)
+      // already have map
       panic("remap");
     *pte = PA2PTE(pa) | perm | PTE_V;
     if(a == last)
@@ -170,6 +179,7 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
 // Remove npages of mappings starting from va. va must be
 // page-aligned. The mappings must exist.
 // Optionally free the physical memory.
+// uninstall mapping,  npages is the page nums, and whether really free the content
 void
 uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
 {
@@ -270,7 +280,7 @@ uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 }
 
 // Recursively free page-table pages.
-// All leaf mappings must already have been removed.
+// All leaf mappings must already have been removed(means that the leaf have been set not valid).
 void
 freewalk(pagetable_t pagetable)
 {
@@ -291,6 +301,7 @@ freewalk(pagetable_t pagetable)
 
 // Free user memory pages,
 // then free page-table pages.
+// free the user memory and page table
 void
 uvmfree(pagetable_t pagetable, uint64 sz)
 {
