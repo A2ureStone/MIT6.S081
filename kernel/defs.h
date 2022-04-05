@@ -182,6 +182,7 @@ void            vmprint(pagetable_t);
 void            vmprint_helper(pagetable_t, int);
 pagetable_t kvminit_process(); // vm.c give a clear kernel page table
 void freewalkNotLeaf(pagetable_t pagetable);
+void freewalkNotLeaf_recur(pagetable_t pagetable, int level);
 
 
 // plic.c

@@ -81,8 +81,10 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
     }
     else
     {
-      if (!alloc || (pagetable = (pde_t *)kalloc()) == 0)
+      if (!alloc || (pagetable = (pde_t *)kalloc()) == 0) {
         return 0;
+      }
+
       memset(pagetable, 0, PGSIZE);
       *pte = PA2PTE(pagetable) | PTE_V;
     }
@@ -455,7 +457,8 @@ int copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   }
 }
 
-void vmprint(pagetable_t pagetable) {
+void vmprint(pagetable_t pagetable)
+{
   printf("page table %p\n", pagetable);
   vmprint_helper(pagetable, 1);
 }
@@ -488,11 +491,10 @@ void vmprint_helper(pagetable_t pagetable, int level)
         printf("error happen\n");
       }
 
-      vmprint_helper((pagetable_t) child, level + 1);
+      vmprint_helper((pagetable_t)child, level + 1);
     }
   }
 }
-
 
 /*
  * create a direct-map clear kernel page table for the process.
@@ -524,72 +526,95 @@ pagetable_t kvminit_process()
 
   // CLINT
   // kvmmap(CLINT, CLINT, 0x10000, PTE_R | PTE_W);
-  va = CLINT;
-  pa = CLINT;
-  sz = 0x10000;
+  // va = CLINT;
+  // pa = CLINT;
+  // sz = 0x10000;
 
-  if (mappages(process_kernel_pagetable, va, sz, pa, perm) != 0)
-    panic("kvmmap");
+  // if (mappages(process_kernel_pagetable, va, sz, pa, perm) != 0)
+  //   panic("kvmmap");
 
   // PLIC
-  // kvmmap(PLIC, PLIC, 0x400000, PTE_R | PTE_W);
+  // kvmmapPKBG(PLIC, PLIC, 0x400000, PTE_R | PTE_W);
   va = PLIC;
   pa = PLIC;
   sz = 0x400000;
 
   if (mappages(process_kernel_pagetable, va, sz, pa, perm) != 0)
-    panic("kvmmap");
+    panic("kvmmapPKBG");
 
   // map kernel text executable and read-only.
-  // kvmmap(KERNBASE, KERNBASE, (uint64)etext - KERNBASE, PTE_R | PTE_X);
+  // kvmmapPKBG(KERNBASE, KERNBASE, (uint64)etext - KERNBASE, PTE_R | PTE_X);
   va = KERNBASE;
   pa = KERNBASE;
   sz = (uint64)etext - KERNBASE;
   perm = PTE_R | PTE_X;
 
   if (mappages(process_kernel_pagetable, va, sz, pa, perm) != 0)
-    panic("kvmmap");
+    panic("kvmmapPKBG");
 
   // map kernel data and the physical RAM we'll make use of.
-  // kvmmap((uint64)etext, (uint64)etext, PHYSTOP - (uint64)etext, PTE_R | PTE_W);
+  // kvmmapPKBG((uint64)etext, (uint64)etext, PHYSTOP - (uint64)etext, PTE_R | PTE_W);
   va = (uint64)etext;
   pa = (uint64)etext;
   sz = PHYSTOP - (uint64)etext;
   perm = PTE_R | PTE_W;
 
   if (mappages(process_kernel_pagetable, va, sz, pa, perm) != 0)
-    panic("kvmmap");
+    panic("kvmmapPKBG");
 
   // map the trampoline for trap entry/exit to
   // the highest virtual address in the kernel.
-  // kvmmap(TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
+  // kvmmapPKBG(TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
   va = TRAMPOLINE;
   pa = (uint64)trampoline;
   sz = PGSIZE;
   perm = PTE_R | PTE_X;
 
   if (mappages(process_kernel_pagetable, va, sz, pa, perm) != 0)
-    panic("kvmmap");
+    panic("kvmmapPKBG");
 
   // finish kvminit set
   return process_kernel_pagetable;
 }
-
 
 // Recursively free page-table pages.
 // All leaf mappings saved
 void freewalkNotLeaf(pagetable_t pagetable)
 {
   // there are 2^9 = 512 PTEs in a page table.
+  // for (int i = 0; i < 512; i++)
+  // {
+  //   pte_t pte = pagetable[i];
+  //   if ((pte & PTE_V) && (pte & (PTE_R | PTE_W | PTE_X)) == 0)
+  //   {
+  //     // this PTE points to a lower-level page table.
+  //     uint64 child = PTE2PA(pte);
+  //     freewalkNotLeaf((pagetable_t)child);
+  //     pagetable[i] = 0;
+  //   }
+  //   // add return?
+  // }
+  // kfree((void *)pagetable);
+  freewalkNotLeaf_recur(pagetable, 3);
+}
+
+// Recursively free page-table pages.
+// All leaf mappings saved
+void freewalkNotLeaf_recur(pagetable_t pagetable, int level)
+{
+  // there are 2^9 = 512 PTEs in a page table.
   for (int i = 0; i < 512; i++)
   {
     pte_t pte = pagetable[i];
-    if ((pte & PTE_V) && (pte & (PTE_R | PTE_W | PTE_X)) == 0)
+    if (level != 1)
     {
-      // this PTE points to a lower-level page table.
-      uint64 child = PTE2PA(pte);
-      freewalkNotLeaf((pagetable_t)child);
-      pagetable[i] = 0;
+      if (pte & PTE_V)
+      {
+        // this PTE points to a lower-level page table.
+        uint64 child = PTE2PA(pte);
+        freewalkNotLeaf_recur((pagetable_t)child, level - 1);
+        pagetable[i] = 0;
+      }
     }
     // add return?
   }

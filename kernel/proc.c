@@ -172,12 +172,10 @@ freeproc(struct proc *p)
   p->trapframe = 0;
   if (p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
-  if (p->process_kernel_pagetable)
-    freewalkNotLeaf(p->process_kernel_pagetable);
   // free kstack, because every allocate process will create a new kstack
   // if (p->kstack)
   //   kfree((void *)p->kstack);
-  p->process_kernel_pagetable = 0;
+
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
@@ -187,6 +185,12 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+
+  // w_satp(MAKE_SATP(kernel_pagetable));
+  sfence_vma();
+  if (p->process_kernel_pagetable)
+    freewalkNotLeaf(p->process_kernel_pagetable);
+  p->process_kernel_pagetable = 0;
 }
 
 // Create a user page table for a given process,
@@ -537,6 +541,7 @@ void scheduler(void)
 
         w_satp(MAKE_SATP(kernel_pagetable));
         sfence_vma();
+
         // Process is done running for now.
         // It should have changed its p->state before coming back.
         c->proc = 0;
