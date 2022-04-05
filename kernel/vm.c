@@ -391,25 +391,25 @@ int copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 // Return 0 on success, -1 on error.
 int copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 {
-  uint64 n, va0, pa0;
+  // uint64 n, va0, pa0;
 
-  while (len > 0)
-  {
-    va0 = PGROUNDDOWN(srcva);
-    pa0 = walkaddr(pagetable, va0);
-    if (pa0 == 0)
-      return -1;
-    n = PGSIZE - (srcva - va0);
-    if (n > len)
-      n = len;
-    memmove(dst, (void *)(pa0 + (srcva - va0)), n);
+  // while (len > 0)
+  // {
+  //   va0 = PGROUNDDOWN(srcva);
+  //   pa0 = walkaddr(pagetable, va0);
+  //   if (pa0 == 0)
+  //     return -1;
+  //   n = PGSIZE - (srcva - va0);
+  //   if (n > len)
+  //     n = len;
+  //   memmove(dst, (void *)(pa0 + (srcva - va0)), n);
 
-    len -= n;
-    dst += n;
-    srcva = va0 + PGSIZE;
-  }
-  return 0;
-  // return copyin_new(pagetable, dst, srcva, len);
+  //   len -= n;
+  //   dst += n;
+  //   srcva = va0 + PGSIZE;
+  // }
+  // return 0;
+  return copyin_new(pagetable, dst, srcva, len);
 }
 
 // Copy a null-terminated string from user to kernel.
@@ -418,48 +418,55 @@ int copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 // Return 0 on success, -1 on error.
 int copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 {
-  uint64 n, va0, pa0;
-  int got_null = 0;
-
-  while (got_null == 0 && max > 0)
-  {
-    va0 = PGROUNDDOWN(srcva);
-    pa0 = walkaddr(pagetable, va0);
-    if (pa0 == 0)
-      return -1;
-    n = PGSIZE - (srcva - va0);
-    if (n > max)
-      n = max;
-
-    char *p = (char *)(pa0 + (srcva - va0));
-    while (n > 0)
-    {
-      if (*p == '\0')
-      {
-        *dst = '\0';
-        got_null = 1;
-        break;
-      }
-      else
-      {
-        *dst = *p;
-      }
-      --n;
-      --max;
-      p++;
-      dst++;
-    }
-
-    srcva = va0 + PGSIZE;
+  if (srcva == 0x6778) {
+    printf("get!!\n");
+    pgPrinter(pagetable);
   }
-  if (got_null)
-  {
-    return 0;
-  }
-  else
-  {
+  if (walkaddr(pagetable, srcva) == 0)
     return -1;
-  }
+  return copyinstr_new(pagetable, dst, srcva, max);
+  // uint64 n, va0, pa0;
+  // int got_null = 0;
+
+  // while (got_null == 0 && max > 0)
+  // {
+  //   va0 = PGROUNDDOWN(srcva);
+  //   pa0 = walkaddr(pagetable, va0);
+  //   if (pa0 == 0)
+  //     return -1;
+  //   n = PGSIZE - (srcva - va0);
+  //   if (n > max)
+  //     n = max;
+
+  //   char *p = (char *)(pa0 + (srcva - va0));
+  //   while (n > 0)
+  //   {
+  //     if (*p == '\0')
+  //     {
+  //       *dst = '\0';
+  //       got_null = 1;
+  //       break;
+  //     }
+  //     else
+  //     {
+  //       *dst = *p;
+  //     }
+  //     --n;
+  //     --max;
+  //     p++;
+  //     dst++;
+  //   }
+
+  //   srcva = va0 + PGSIZE;
+  // }
+  // if (got_null)
+  // {
+  //   return 0;
+  // }
+  // else
+  // {
+  //   return -1;
+  // }
 }
 
 void vmprint(pagetable_t pagetable)
@@ -648,6 +655,7 @@ uvmalloc_kpg(pagetable_t pagetable, pagetable_t kpg, uint64 oldsz, uint64 newsz)
     }
     memset(mem, 0, PGSIZE);
     int map1 = mappages(pagetable, a, PGSIZE, (uint64)mem, PTE_W | PTE_X | PTE_R | PTE_U);
+    // int map2 = mappages(kpg, a, PGSIZE, (uint64)mem, PTE_W | PTE_X | PTE_R | PTE_U);
     int map2 = mappages(kpg, a, PGSIZE, (uint64)mem, PTE_W | PTE_X | PTE_R);
     // int map2 = 0;
     if (map1 != 0 || map2 != 0)
@@ -694,7 +702,9 @@ int uvmcopy_kpg(pagetable_t old, pagetable_t new, pagetable_t kpg, uint64 sz)
     if ((mem = kalloc()) == 0)
       goto err;
     memmove(mem, (char *)pa, PGSIZE);
-    int map2 = mappages(kpg, i, PGSIZE, (uint64)mem, (flags & !PTE_U));
+    // int map2 = mappages(kpg, i, PGSIZE, (uint64)mem, PTE_V | PTE_R | PTE_W | PTE_X);
+    int map2 = mappages(kpg, i, PGSIZE, (uint64)mem, (flags & ~PTE_U));
+    // int map2 = mappages(kpg, i, PGSIZE, (uint64)mem, flags);
     int map1 = mappages(new, i, PGSIZE, (uint64)mem, flags);
 
     // int map2 = 0;
@@ -712,17 +722,7 @@ err:
   return -1;
 }
 
-// void freeKpg(pagetable_t kpg)
-// {
-//   for (uint64 i = 0; i < PLIC; i += PGSIZE)
-//   {
-//     pte_t *pte = walk(kpg, i, 0);
-//     if (pte != 0 && (*pte & PTE_V))
-//     {
-//       uvmunmap(kpg, i, 1, 0);
-//     }
-//   }
-// }
+
 
 // Remove npages of mappings starting from va. va must be
 // page-aligned. The mappings must exist.
@@ -757,4 +757,57 @@ void uvminit_kpg(pagetable_t pagetable, pagetable_t kpg, uchar *src, uint sz)
   mappages(pagetable, 0, PGSIZE, (uint64)mem, PTE_W | PTE_R | PTE_X | PTE_U);
   mappages(kpg, 0, PGSIZE, (uint64)mem, PTE_W | PTE_R | PTE_X);
   memmove(mem, src, sz);
+}
+
+
+uint64
+walkaddr_change(pagetable_t pagetable, uint64 va)
+{
+  pte_t *pte;
+  uint64 pa;
+
+  if (va >= MAXVA)
+    return 0;
+
+  pte = walk(pagetable, va, 0);
+  if (pte == 0)
+    return 0;
+  if ((*pte & PTE_V) == 0)
+    return 0;
+  pa = PTE2PA(*pte);
+  return pa;
+}
+
+
+void pageTableEqual(pagetable_t upg, pagetable_t kpg) {
+  for (int i = 0; i < PLIC; i += PGSIZE) {
+    uint64 pte1 = walkaddr_change(upg, i);
+    uint64 pte2 = walkaddr_change(kpg, i);
+    if (pte1 != pte2) {
+      printf("not equal va: %p\nupg pa: %p, kpg pa: %p\n", i, pte1, pte2);
+    }
+  }
+}
+
+
+// mark a PTE invalid for user access.
+// used by exec for the user stack guard page.
+void uvmclear_kernelVersion(pagetable_t pagetable, uint64 va)
+{
+  pte_t *pte;
+
+  pte = walk(pagetable, va, 0);
+  // printf("invalid va: %p\n", va);
+  if (pte == 0)
+    panic("uvmclear");
+  *pte &= ~PTE_V;
+}
+
+void pgPrinter(pagetable_t pagetable) {
+  for (int i = 0; i < 0x10000; i += PGSIZE) {
+    pte_t* pte = walk(pagetable, i, 0);
+    if (pte != 0) {
+      printf("va: %p, pte: %p, pa: %p, perm: %p\n", i, *pte, PTE2PA(*pte), PTE_FLAGS(*pte));
+    }
+  }
 }

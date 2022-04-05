@@ -183,6 +183,7 @@ void            vmprint_helper(pagetable_t, int);
 pagetable_t kvminit_process(); // vm.c give a clear kernel page table
 void freewalkNotLeaf(pagetable_t pagetable);
 void freewalkNotLeaf_recur(pagetable_t pagetable, int level);
+void pgPrinter(pagetable_t pagetable); 
 
 
 uint64 uvmalloc_kpg(pagetable_t pagetable, pagetable_t kpg, uint64 oldsz, uint64 newsz);
@@ -191,6 +192,10 @@ int uvmcopy_kpg(pagetable_t old, pagetable_t new, pagetable_t kpg, uint64 sz);
 void freeKpg(pagetable_t kpg); 
 void uvminit_kpg(pagetable_t pagetable, pagetable_t kpg, uchar *src, uint sz);
 int copyin_new(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len);
+void pageTableEqual(pagetable_t upg, pagetable_t kpg); 
+uint64 walkaddr_change(pagetable_t pagetable, uint64 va);
+int copyinstr_new(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max);
+void uvmclear_kernelVersion(pagetable_t pagetable, uint64 va);
 
 // plic.c
 void            plicinit(void);

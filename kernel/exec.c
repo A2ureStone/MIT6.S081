@@ -21,6 +21,8 @@ exec(char *path, char **argv)
   pagetable_t pagetable = 0, oldpagetable;
   struct proc *p = myproc();
 
+  // oldpagetable = p->pagetable;
+
   // free the user part of kpg
   freeKpg(p->process_kernel_pagetable); 
 
@@ -40,6 +42,10 @@ exec(char *path, char **argv)
 
   if((pagetable = proc_pagetable(p)) == 0)
     goto bad;
+
+
+  // p->pagetable = pagetable;
+
 
   // Load program into memory.
   for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
@@ -75,9 +81,16 @@ exec(char *path, char **argv)
     goto bad;
   sz = sz1;
   uvmclear(pagetable, sz-2*PGSIZE);
-  uvmclear(p->process_kernel_pagetable, sz-2*PGSIZE);
+  uvmclear_kernelVersion(p->process_kernel_pagetable, sz-2*PGSIZE);
+  // uvmclear(p->process_kernel_pagetable, sz-2*PGSIZE);
   sp = sz;
   stackbase = sp - PGSIZE;
+  printf("-------------------\n");
+  printf("pagetable\n");
+  pgPrinter(pagetable);
+  printf("process kernel page table\n");
+  pgPrinter(p->process_kernel_pagetable);
+  printf("-------------------\n");
 
   // Push argument strings, prepare rest of stack in ustack.
   for(argc = 0; argv[argc]; argc++) {
@@ -121,13 +134,20 @@ exec(char *path, char **argv)
   proc_freepagetable(oldpagetable, oldsz);
 
   if(p->pid==1) vmprint(p->pagetable);
+
+  // printf("exec\n");
+  // pageTableEqual(p->pagetable, p->process_kernel_pagetable);
+  // pgPrinter(p->pagetable);
+  // pgPrinter(p->process_kernel_pagetable);
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:
+  // p->pagetable = oldpagetable;
   if(pagetable)
     proc_freepagetable(pagetable, sz);
   // if (p->process_kernel_pagetable)
   //   freewalkNotLeaf(p->process_kernel_pagetable);
+  // freeKpg(p->process_kernel_pagetable);
   if(ip){
     iunlockput(ip);
     end_op();

@@ -167,6 +167,7 @@ found:
 static void
 freeproc(struct proc *p)
 {
+  // pageTableEqual(p->pagetable, p->process_kernel_pagetable);
   if (p->trapframe)
     kfree((void *)p->trapframe);
   p->trapframe = 0;
@@ -294,6 +295,8 @@ int growproc(int n)
     sz = uvmdealloc_kpg(p->pagetable, p->process_kernel_pagetable, sz, sz + n);
   }
   p->sz = sz;
+  // printf("growproc\n");
+  // pageTableEqual(p->pagetable, p->process_kernel_pagetable);
   return 0;
 }
 
@@ -341,6 +344,9 @@ int fork(void)
   np->state = RUNNABLE;
 
   release(&np->lock);
+
+  // printf("fork\n");
+  // pageTableEqual(p->pagetable, p->process_kernel_pagetable);
 
   return pid;
 }
