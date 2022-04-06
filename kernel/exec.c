@@ -86,8 +86,12 @@ exec(char *path, char **argv)
   sp = sz;
   stackbase = sp - PGSIZE;
   printf("-------------------\n");
+  printf("original\n");
+  pgPrinter(p->pagetable);
+  printf("-------------------\n");
   printf("pagetable\n");
   pgPrinter(pagetable);
+  printf("-------------------\n");
   printf("process kernel page table\n");
   pgPrinter(p->process_kernel_pagetable);
   printf("-------------------\n");

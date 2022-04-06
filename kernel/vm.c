@@ -418,6 +418,7 @@ int copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 // Return 0 on success, -1 on error.
 int copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 {
+  printf("srcva: %p\n", srcva);
   if (srcva == 0x6778) {
     printf("get!!\n");
     pgPrinter(pagetable);
