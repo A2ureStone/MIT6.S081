@@ -52,7 +52,6 @@ sys_sbrk(void)
   return addr;
 }
 
-extern pagetable_t kernel_pagetable;
 
 uint64
 sys_sleep(void)
@@ -77,9 +76,9 @@ sys_sleep(void)
       release(&tickslock);
       return -1;
     }
-    
+
     // backtrace(p->pagetable, p->trapframe->s0);
-    backtrace(kernel_pagetable, r_fp());
+    backtrace();
     sleep(&ticks, &tickslock);
   }
   release(&tickslock);

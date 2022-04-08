@@ -83,6 +83,31 @@ argstr(int n, char *buf, int max)
   return fetchstr(addr, buf, max);
 }
 
+
+uint64
+sys_sigalarm(void) {
+  int tick;
+  uint64 handler;
+  struct proc* p = myproc();
+  if (argint(0, &tick))
+    return -1;
+  if (argaddr(1, &handler))
+    return -1;
+
+  p->alarm_interval = tick;
+  p->alarm_handler = (void (*)())handler;
+  return 0;
+}
+
+uint64
+sys_sigreturn(void) {
+  struct proc* p = myproc();
+  *(p->trapframe) = p->saved_trapframe;
+  p->pass_ticks = 0;
+  return 0;
+}
+
+
 extern uint64 sys_chdir(void);
 extern uint64 sys_close(void);
 extern uint64 sys_dup(void);
@@ -127,6 +152,8 @@ static uint64 (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+[SYS_sigalarm]   sys_sigalarm,
+[SYS_sigreturn]   sys_sigreturn
 };
 
 void

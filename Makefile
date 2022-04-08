@@ -176,7 +176,7 @@ UPROGS=\
 	$U/_wc\
 	$U/_zombie\
 	$U/_ptascii\
-	# $U/_alarmtest\
+	$U/_alarmtest\
 
 
 
