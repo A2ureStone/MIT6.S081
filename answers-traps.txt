@@ -1,0 +1,18 @@
+1.
+a0 = 40 + 1968 = 0x3d8
+a1 = 12
+a2 = 13
+ra = 30
+printf add = 30 + 1536 = 1566
+2.
+00026 calculate 12
+3.
+add = 0x630
+4.
+ra = 38
+5.
+HE110 World
+0x726c6400
+6.
+argument list, read from the memory with the specified length
+
