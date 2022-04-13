@@ -95,6 +95,8 @@ void usertrap(void)
         *pte = 0;
         if (mappages(p->pagetable, i, PGSIZE, (uint64)mem, flags) != 0)
         {
+          // panic("cow map faild");
+          // maybe because of no memory
           p->killed = 1;
           break;
         }
