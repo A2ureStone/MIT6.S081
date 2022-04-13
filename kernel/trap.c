@@ -71,19 +71,21 @@ void usertrap(void)
   else if (r_scause() == 15)
   {
     uint64 va = r_stval();
-    pte_t *pte = walkaddr(p->pagetable, va);
+    pte_t *pte = walkPTE(p->pagetable, va, 0);
     uint64 pa;
     uint flags;
     if (PTE_FLAGS(*pte) & PTE_C)
     {
       for (int i = 0; i < p->sz; i += PGSIZE)
       {
-        pte = walkaddr(p->pagetable, i);
+        pte = walkPTE(p->pagetable, i, 0);
+        if (pte == 0)
+          panic("cow: pte should exist");
         pa = PTE2PA(*pte);
         flags = PTE_FLAGS(*pte);
         flags = flags | PTE_W;
         flags = flags & ~PTE_C;
-        uint64 mem = kalloc();
+        void* mem = kalloc();
         if (mem == 0) {
           // memory out, kill process
           p->killed = 1;
@@ -91,12 +93,12 @@ void usertrap(void)
         }
         memmove(mem, (char *)pa, PGSIZE);
         *pte = 0;
-        if (mappages(p->pagetable, i, PGSIZE, mem, flags) != 0)
+        if (mappages(p->pagetable, i, PGSIZE, (uint64)mem, flags) != 0)
         {
           p->killed = 1;
           break;
         }
-        kfree(pa);
+        kfree((void *)pa);
       }
     }
     else
