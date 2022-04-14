@@ -74,37 +74,50 @@ void usertrap(void)
     pte_t *pte = walkPTE(p->pagetable, va, 0);
     uint64 pa;
     uint flags;
+
+    // if (pte == 0)
+    //   panic("cow: pte should exist\n");
+    // if ((PTE_FLAGS(*pte) & PTE_V) == 0)
+    //   panic("cow: pte not valid\n");
+
     if (PTE_FLAGS(*pte) & PTE_C)
     {
-      for (int i = 0; i < p->sz; i += PGSIZE)
+      pa = PTE2PA(*pte);
+      flags = PTE_FLAGS(*pte);
+      flags = flags | PTE_W;
+      flags = flags & ~PTE_C;
+      void *mem = kalloc();
+      if (mem == 0)
       {
-        pte = walkPTE(p->pagetable, i, 0);
-        if (pte == 0)
-          panic("cow: pte should exist");
-        pa = PTE2PA(*pte);
-        flags = PTE_FLAGS(*pte);
-        flags = flags | PTE_W;
-        flags = flags & ~PTE_C;
-        void* mem = kalloc();
-        if (mem == 0) {
-          // memory out, kill process
-          p->killed = 1;
-          break;
-        }
+        // memory out, kill process
+        p->killed = 1;
+      }
+      else
+      {
         memmove(mem, (char *)pa, PGSIZE);
         *pte = 0;
-        if (mappages(p->pagetable, i, PGSIZE, (uint64)mem, flags) != 0)
+        if (mappages(p->pagetable, PGROUNDDOWN(va), PGSIZE, (uint64)mem, flags) != 0)
         {
-          // panic("cow map faild");
           // maybe because of no memory
+          kfree(mem);
           p->killed = 1;
-          break;
+        } else {
+          kfree((void *)pa);
         }
-        kfree((void *)pa);
       }
+      // memmove(mem, (char *)pa, PGSIZE);
+      // *pte = 0;
+      // if (mappages(p->pagetable, PGROUNDDOWN(va), PGSIZE, (uint64)mem, flags) != 0)
+      // {
+      //   // maybe because of no memory
+      //   kfree(mem);
+      //   p->killed = 1;
+      // }
+      // kfree((void *)pa);
     }
     else
     {
+      // not cow page, print error message
       printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
       printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
       p->killed = 1;

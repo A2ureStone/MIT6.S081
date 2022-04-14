@@ -381,6 +381,9 @@ void uvmclear(pagetable_t pagetable, uint64 va)
 int copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 {
   uint64 n, va0, pa0;
+  pte_t *pte;
+  uint64 pa;
+  uint flags;
 
   while (len > 0)
   {
@@ -388,6 +391,32 @@ int copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
     pa0 = walkaddr(pagetable, va0);
     if (pa0 == 0)
       return -1;
+    // check for cow page
+    pte = walk(pagetable, va0, 0);
+    if (PTE_FLAGS(*pte) & PTE_C)
+    {
+      pa = PTE2PA(*pte);
+      flags = PTE_FLAGS(*pte);
+      flags = flags | PTE_W;
+      flags = flags & ~PTE_C;
+      void *mem = kalloc();
+      if (mem == 0)
+      {
+        // memory out, kill process
+        return -1;
+      }
+      memmove(mem, (char *)pa, PGSIZE);
+      *pte = 0;
+      if (mappages(pagetable, va0, PGSIZE, (uint64)mem, flags) != 0)
+      {
+        // maybe because of no memory
+        kfree(mem);
+        return -1;
+      }
+      kfree((void *)pa);
+      pa0 = (uint64)mem;
+    }
+
     n = PGSIZE - (dstva - va0);
     if (n > len)
       n = len;
@@ -498,4 +527,3 @@ walkPTE(pagetable_t pagetable, uint64 va, int alloc)
   }
   return &pagetable[PX(0, va)];
 }
-
