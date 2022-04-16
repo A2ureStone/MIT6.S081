@@ -17,6 +17,7 @@ extern char trampoline[]; // trampoline.S
 
 extern uint page_ref[];
 
+
 /*
  * create a direct-map page table for the kernel.
  */
@@ -340,7 +341,8 @@ int uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     {
       goto err;
     }
-    page_ref[REFINDEX(PA2IND(pa))] += 1;
+
+    incRef(pa);
     // add ref
   }
   return 0;
