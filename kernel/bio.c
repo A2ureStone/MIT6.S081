@@ -23,7 +23,7 @@
 #include "buf.h"
 
 #define BUCKET_NUM 13
-#define BUF_PER_BUCKET 5
+#define BUF_PER_BUCKET 3
 
 // struct
 // {
@@ -54,15 +54,15 @@ void binit(void)
 {
   // struct buf *b;
 
-  initlock(&cache.lock, "cache spinlock");
+  initlock(&cache.lock, "bcache.cache spinlock");
 
   for (int i = 0; i < BUCKET_NUM; ++i)
   {
     for (int j = 0; j < BUF_PER_BUCKET; ++j)
     {
-      initsleeplock(&(cache.buf[i][j].lock), "hash cache");
+      initsleeplock(&(cache.buf[i][j].lock), "bcache.hash cache");
     }
-    initlock(&(cache.bucket_lock[i]), "bucket spinlock");
+    initlock(&(cache.bucket_lock[i]), "bcache.bucket spinlock");
   }
 }
 
