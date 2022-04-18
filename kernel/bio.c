@@ -23,7 +23,7 @@
 #include "buf.h"
 
 #define BUCKET_NUM 13
-#define BUF_PER_BUCKET 3
+#define BUF_PER_BUCKET 5
 
 // struct
 // {
