@@ -24,7 +24,7 @@
 #define min(a, b) ((a) < (b) ? (a) : (b))
 // there should be one superblock per disk device, but we run with
 // only one device
-struct superblock sb; 
+struct superblock sb;
 
 // Read the super block.
 static void
@@ -180,7 +180,7 @@ void
 iinit()
 {
   int i = 0;
-  
+
   initlock(&icache.lock, "icache");
   for(i = 0; i < NINODE; i++) {
     initsleeplock(&icache.inode[i].lock, "inode");
@@ -379,22 +379,49 @@ bmap(struct inode *ip, uint bn)
 {
   uint addr, *a;
   struct buf *bp;
+  uint level, offset;
 
-  if(bn < NDIRECT){
+  if(bn < L1BLOCK_ST){
     if((addr = ip->addrs[bn]) == 0)
       ip->addrs[bn] = addr = balloc(ip->dev);
     return addr;
   }
-  bn -= NDIRECT;
+  bn -= L1BLOCK_ST;
 
-  if(bn < NINDIRECT){
-    // Load indirect block, allocating if necessary.
-    if((addr = ip->addrs[NDIRECT]) == 0)
-      ip->addrs[NDIRECT] = addr = balloc(ip->dev);
+  if(bn < L1INDIRECT_BLOCK_NUM){
+    // Load Level 1 indirect block, allocating if necessary.
+    if((addr = ip->addrs[L1INDIRECT]) == 0)
+      ip->addrs[L1INDIRECT] = addr = balloc(ip->dev);
     bp = bread(ip->dev, addr);
     a = (uint*)bp->data;
     if((addr = a[bn]) == 0){
       a[bn] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+    return addr;
+  }
+  bn -= L1INDIRECT_BLOCK_NUM;
+
+  if (bn < L2INDIRECT_BLOCK_NUM) {
+    // Load Level 2 indirect block, allocating if necessary
+    level = bn / L1INDIRECT_BLOCK_NUM;
+    offset = bn % L1INDIRECT_BLOCK_NUM;
+
+    if ((addr = ip->addrs[L2INDIRECT]) == 0)
+      ip->addrs[L2INDIRECT] = addr = balloc(ip->dev);
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    if ((addr = a[level]) == 0) {
+      a[level] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    if ((addr = a[offset]) == 0) {
+      a[offset] = addr = balloc(ip->dev);
       log_write(bp);
     }
     brelse(bp);
@@ -410,26 +437,46 @@ void
 itrunc(struct inode *ip)
 {
   int i, j;
-  struct buf *bp;
-  uint *a;
+  struct buf *bp, *leaf_block;
+  uint *a, *b;
 
-  for(i = 0; i < NDIRECT; i++){
+  for(i = 0; i < L1INDIRECT; i++){
     if(ip->addrs[i]){
       bfree(ip->dev, ip->addrs[i]);
       ip->addrs[i] = 0;
     }
   }
 
-  if(ip->addrs[NDIRECT]){
-    bp = bread(ip->dev, ip->addrs[NDIRECT]);
+  if(ip->addrs[L1INDIRECT]){
+    bp = bread(ip->dev, ip->addrs[L1INDIRECT]);
     a = (uint*)bp->data;
-    for(j = 0; j < NINDIRECT; j++){
+    for(j = 0; j < L1INDIRECT; j++){
       if(a[j])
         bfree(ip->dev, a[j]);
     }
     brelse(bp);
-    bfree(ip->dev, ip->addrs[NDIRECT]);
-    ip->addrs[NDIRECT] = 0;
+    bfree(ip->dev, ip->addrs[L1INDIRECT]);
+    ip->addrs[L1INDIRECT] = 0;
+  }
+
+  if (ip->addrs[L2INDIRECT]) {
+    bp = bread(ip->dev, ip->addrs[L2INDIRECT]);
+    a = (uint*)bp->data;
+    for (i = 0; i < L1INDIRECT_BLOCK_NUM; ++i) {
+      if (a[i]) {
+        leaf_block = bread(ip->dev, a[i]);
+        b = (uint*)leaf_block->data;
+        for (j = 0; j < L1INDIRECT_BLOCK_NUM; ++j) {
+          if (b[j])
+            bfree(ip->dev, b[j]);
+        }
+        brelse(leaf_block);
+        bfree(ip->dev, a[i]);
+      }
+    }
+    brelse(bp);
+    bfree(ip->dev, ip->addrs[L2INDIRECT]);
+    ip->addrs[L2INDIRECT] = 0;
   }
 
   ip->size = 0;
