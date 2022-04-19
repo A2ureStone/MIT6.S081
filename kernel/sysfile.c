@@ -52,6 +52,29 @@ fdalloc(struct file *f)
   return -1;
 }
 
+static struct inode*
+followLink(char* path, int num) {
+  struct inode* ip;
+  char target[MAXPATH];
+
+  if (num == 10)
+    return 0;
+  ip = namei(path);
+
+  if (ip == 0)
+    return 0;
+
+  if (ip->type != T_SYMLINK) {
+    // ilock(ip);
+    return ip;
+  }
+
+  // memcmp(target, ip->target, MAXPATH);
+  strncpy(target, ip->target, strlen(ip->target));
+  iput(ip);
+  return followLink(target, num + 1);
+}
+
 uint64
 sys_dup(void)
 {
@@ -290,6 +313,7 @@ sys_open(void)
   int fd, omode;
   struct file *f;
   struct inode *ip;
+  struct inode *cp;
   int n;
 
   if((n = argstr(0, path, MAXPATH)) < 0 || argint(1, &omode) < 0)
@@ -313,6 +337,20 @@ sys_open(void)
       iunlockput(ip);
       end_op();
       return -1;
+    }
+
+    if (ip->type == T_SYMLINK && (omode & O_NOFOLLOW) == 0) {
+      // follow the symbol link
+      cp = followLink(ip->target, 0);
+      if (cp == 0) {
+        // follow symbol link fail
+        iunlockput(ip);
+        end_op();
+        return -1;
+      }
+      iunlockput(ip);
+      ip = cp;
+      ilock(ip);
     }
   }
 
@@ -393,7 +431,7 @@ sys_chdir(void)
   char path[MAXPATH];
   struct inode *ip;
   struct proc *p = myproc();
-  
+
   begin_op();
   if(argstr(0, path, MAXPATH) < 0 || (ip = namei(path)) == 0){
     end_op();
@@ -482,5 +520,31 @@ sys_pipe(void)
     fileclose(wf);
     return -1;
   }
+  return 0;
+}
+
+uint64
+sys_symlink(void) {
+  char target[MAXPATH];
+  char path[MAXPATH];
+  struct inode *ip;
+  int n;
+
+  if((n = argstr(0, target, MAXPATH)) < 0 || argstr(1, path, MAXPATH) < 0)
+    return -1;
+
+  begin_op();
+  ip = create(path, T_SYMLINK, 0, 0);
+
+  if (ip == 0)
+    return -1;
+
+  memmove(ip->target, target, MAXPATH);
+  // strncpy(ip->target, target, strlen(target));
+  iupdate(ip);
+  iunlockput(ip);
+
+  end_op();
+
   return 0;
 }
