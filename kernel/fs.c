@@ -450,7 +450,7 @@ itrunc(struct inode *ip)
   if(ip->addrs[L1INDIRECT]){
     bp = bread(ip->dev, ip->addrs[L1INDIRECT]);
     a = (uint*)bp->data;
-    for(j = 0; j < L1INDIRECT; j++){
+    for(j = 0; j < L1INDIRECT_BLOCK_NUM; j++){
       if(a[j])
         bfree(ip->dev, a[j]);
     }
