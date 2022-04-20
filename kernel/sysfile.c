@@ -536,8 +536,10 @@ sys_symlink(void) {
   begin_op();
   ip = create(path, T_SYMLINK, 0, 0);
 
-  if (ip == 0)
+  if (ip == 0) {
+    end_op();
     return -1;
+  }
 
   memmove(ip->target, target, MAXPATH);
   // strncpy(ip->target, target, strlen(target));
