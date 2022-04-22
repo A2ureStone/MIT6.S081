@@ -95,3 +95,38 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64
+sys_mmap(void) {
+  int prot, flags, fd;
+  int length, offset;
+  uint64 addr;
+  struct proc* p;
+  int index;
+
+  if (argaddr(0, &addr) < 0 || argint(1, &length) < 0 || argint(2, &prot) < 0
+  ||  argint(3, &fd) < 0 || argint(4, &offset) < 0) {
+    return -1;
+  }
+
+  // find the empty vma entry
+  for (index = 0; index < VMA_NUM; ++index) {
+    if (p->mmap_area[index].ffile != 0)
+      break;
+  }
+  // lazy allocation
+  p = myproc();
+  p->mmap_area[index].addr = 0;
+  p->mmap_area[index].length = length;
+  p->mmap_area[index].prot = prot;
+  p->mmap_area[index].ffile = p->ofile[fd];
+  filedup(p->mmap_area[index].ffile);
+  // incrent the ref of file
+  p->mmap_area[index].offset = offset;
+
+  return 0;
+}
+
+uint64 sys_munmap(void) {
+  return 1;
+}
