@@ -20,6 +20,7 @@ static void wakeup1(struct proc *chan);
 static void freeproc(struct proc *p);
 
 extern char trampoline[]; // trampoline.S
+extern uint64 m_unmap(uint64 addr, int length, int id);
 
 
 // Allocate a page for each process's kernel stack.
@@ -366,6 +367,17 @@ exit(int status)
       struct file *f = p->ofile[fd];
       fileclose(f);
       p->ofile[fd] = 0;
+    }
+  }
+
+  for (int i = 0; i < VMA_NUM; ++i) {
+    if (p->mmap_area[i].ffile == 0)
+      continue;
+    for (int j = 0; j < VMA_PG_NUM; ++j) {
+      if (p->mmap_area[i].pg[j] != 0) {
+        uint64 addr = p->mmap_area[i].addr + j * PGSIZE;
+        m_unmap(addr, PGSIZE, i);
+      }
     }
   }
 

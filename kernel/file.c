@@ -407,6 +407,51 @@ uint64 sys_munmap(void)
         printf("write once------------------\n");
       }
     }
+    p->mmap_area[id].pg[(start - p->mmap_area[id].addr) / PGSIZE] = 0;
+    uvmunmap(p->pagetable, start, 1, 1);
+  }
+
+  nums = (PGROUNDUP(addr + length) - addr) / PGSIZE;
+  p->mmap_area[id].alcat_pg_nums -= nums;
+
+  return 0;
+}
+
+uint64 m_unmap(uint64 addr, int length, int id)
+{
+  uint64 nums;
+  struct proc *p = myproc();
+
+
+  for (uint64 start = addr; start < addr + length; start += PGSIZE)
+  {
+    pte_t *pte = walk(p->pagetable, start, 0);
+    // some unmapped pages
+    if (*pte == 0)
+      continue;
+
+    if (p->mmap_area[id].flags == MAP_SHARED)
+    {
+      int dirty = PTE_FLAGS(*pte) & PTE_D;
+      uint write_bytes = PGSIZE;
+      uint offset = p->mmap_area[id].offset + start - p->mmap_area[id].addr;
+      if (dirty)
+      {
+        // this is wrong when you need to append file
+        if (start + PGSIZE > p->mmap_area[id].addr + p->mmap_area[id].length)
+          write_bytes = p->mmap_area[id].addr + p->mmap_area[id].length - start;
+
+        begin_op();
+        ilock(p->mmap_area[id].ffile->ip);
+        printf("write addr: %p, write bytes: %d\n", start, write_bytes);
+        if (writei(p->mmap_area[id].ffile->ip, 1, start, offset, write_bytes) != write_bytes)
+          panic("write error");
+        iunlock(p->mmap_area[id].ffile->ip);
+        end_op();
+        printf("write once------------------\n");
+      }
+    }
+    p->mmap_area[id].pg[(start - p->mmap_area[id].addr) / PGSIZE] = 0;
     uvmunmap(p->pagetable, start, 1, 1);
   }
 
