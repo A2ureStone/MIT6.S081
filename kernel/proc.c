@@ -137,10 +137,18 @@ found:
   // initialize the vma
   for (int i = 0; i < VMA_NUM; ++i) {
     p->mmap_area[i].ffile = 0;
+    p->mmap_area[i].pg_nums = 0;
+    p->mmap_area[i].alcat_pg_nums = 0;
+    for (int j = 0; j < VMA_PG_NUM; ++j) {
+      p->mmap_area[i].pg[j] = 0;
+    }
   }
 
   // set mmap stack
   p->mmap_sp = TRAPFRAME;
+
+
+
 
   return p;
 }

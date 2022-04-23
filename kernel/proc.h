@@ -18,6 +18,8 @@ struct context {
   uint64 s11;
 };
 
+#define VMA_PG_NUM 5
+
 // virtual memory area
 struct vma {
   struct file* ffile;
@@ -26,6 +28,9 @@ struct vma {
   uint64 offset;
   int prot;
   int flags;
+  int pg_nums;
+  int alcat_pg_nums;
+  int pg[VMA_PG_NUM];
 
 };
 

@@ -38,3 +38,5 @@ struct devsw {
 extern struct devsw devsw[];
 
 #define CONSOLE 1
+
+#define VMA_PG_NUM 5

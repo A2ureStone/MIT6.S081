@@ -147,6 +147,4 @@ sys_uptime(void)
 //   return vma_start;
 // }
 
-uint64 sys_munmap(void) {
-  return 1;
-}
+
