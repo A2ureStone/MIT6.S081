@@ -371,7 +371,6 @@ uint64 sys_munmap(void)
   if (id == VMA_NUM)
     panic("munmap: cannot find the vma entry");
 
-
   // for (uint64 start = addr; start < addr + length; start += PGSIZE) {
   //   // error version, just check if one of the page not mapped, return
   //   pte_t* pte = walk(p->pagetable, start, 0);
@@ -379,20 +378,19 @@ uint64 sys_munmap(void)
   //     return 0;
   // }
 
-
-  // write the page back to the file
-  if (p->mmap_area[id].flags == MAP_SHARED)
+  // write the page back to the file, if dirty
+  for (uint64 start = addr; start < addr + length; start += PGSIZE)
   {
-    for (uint64 start = addr; start < addr + length; start += PGSIZE)
+    pte_t *pte = walk(p->pagetable, start, 0);
+    // some unmapped pages
+    if (*pte == 0)
+      continue;
+
+    if (p->mmap_area[id].flags == MAP_SHARED)
     {
+      int dirty = PTE_FLAGS(*pte) & PTE_D;
       uint write_bytes = PGSIZE;
       uint offset = p->mmap_area[id].offset + start - p->mmap_area[id].addr;
-      pte_t *pte = walk(p->pagetable, addr, 0);
-      if (pte == 0)
-        panic("munmap: pte should exist");
-
-      int dirty = PTE_FLAGS(*pte) & PTE_D;
-
       if (dirty)
       {
         // this is wrong when you need to append file
@@ -406,12 +404,13 @@ uint64 sys_munmap(void)
           panic("write error");
         iunlock(p->mmap_area[id].ffile->ip);
         end_op();
+        printf("write once------------------\n");
       }
     }
+    uvmunmap(p->pagetable, start, 1, 1);
   }
 
   nums = (PGROUNDUP(addr + length) - addr) / PGSIZE;
-  uvmunmap(p->pagetable, addr, nums, 1);
   p->mmap_area[id].alcat_pg_nums -= nums;
 
   return 0;
