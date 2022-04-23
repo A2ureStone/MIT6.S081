@@ -315,6 +315,10 @@ fork(void)
 
   safestrcpy(np->name, p->name, sizeof(p->name));
 
+  memmove(np->mmap_area, p->mmap_area, sizeof(p->mmap_area));
+
+  np->mmap_sp = p->mmap_sp;
+
   pid = np->pid;
 
   np->state = RUNNABLE;
