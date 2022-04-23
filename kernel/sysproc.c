@@ -6,6 +6,8 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
+#include "fcntl.h"
+// #include "file.h"
 
 uint64
 sys_exit(void)
@@ -96,36 +98,54 @@ sys_uptime(void)
   return xticks;
 }
 
-uint64
-sys_mmap(void) {
-  int prot, flags, fd;
-  int length, offset;
-  uint64 addr;
-  struct proc* p;
-  int index;
+// uint64
+// sys_mmap(void) {
+//   int prot, fd;
+//   int write, read;
+//   int length, offset;
+//   uint64 addr;
+//   struct proc* p;
+//   int index;
+//   uint64 vma_start;
+//   // uint64 vma_end;
+//   p = myproc();
 
-  if (argaddr(0, &addr) < 0 || argint(1, &length) < 0 || argint(2, &prot) < 0
-  ||  argint(3, &fd) < 0 || argint(4, &offset) < 0) {
-    return -1;
-  }
+//   if (argaddr(0, &addr) < 0 || argint(1, &length) < 0 || argint(2, &prot) < 0
+//   ||  argint(3, &fd) < 0 || argint(4, &offset) < 0) {
+//     return -1;
+//   }
 
-  // find the empty vma entry
-  for (index = 0; index < VMA_NUM; ++index) {
-    if (p->mmap_area[index].ffile != 0)
-      break;
-  }
-  // lazy allocation
-  p = myproc();
-  p->mmap_area[index].addr = 0;
-  p->mmap_area[index].length = length;
-  p->mmap_area[index].prot = prot;
-  p->mmap_area[index].ffile = p->ofile[fd];
-  filedup(p->mmap_area[index].ffile);
-  // incrent the ref of file
-  p->mmap_area[index].offset = offset;
+//   read = prot & PROT_READ;
+//   write = prot & PROT_WRITE;
 
-  return 0;
-}
+//   // permission check
+//   if (read && !p->ofile[fd]->readable)
+//     return -1;
+//   if (write && !p->ofile[fd]->writable)
+//     return -1;
+
+
+//   // find the empty vma entry
+//   for (index = 0; index < VMA_NUM; ++index) {
+//     if (p->mmap_area[index].ffile == 0)
+//       break;
+//   }
+
+//   // record info of lazy allocation
+//   p->mmap_area[index].length = length;
+//   p->mmap_area[index].prot = prot;
+//   p->mmap_area[index].ffile = p->ofile[fd];
+//   filedup(p->mmap_area[index].ffile);
+//   // incrent the ref of file
+//   p->mmap_area[index].offset = offset;
+
+//   // change mmap stack
+//   vma_start = PGROUNDDOWN(p->mmap_sp - length);
+//   p->mmap_area[index].addr = vma_start;
+//   p->mmap_sp = vma_start;
+
+//   return vma_start;
+// }
 
 uint64 sys_munmap(void) {
   return 1;

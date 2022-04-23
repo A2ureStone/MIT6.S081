@@ -116,5 +116,6 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
-  struct vma mmap_area[VMA_NUM];
+  struct vma mmap_area[VMA_NUM];  // no need to lock, only one kernel thread in each app
+  uint64 mmap_sp;
 };

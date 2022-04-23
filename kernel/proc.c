@@ -139,6 +139,9 @@ found:
     p->mmap_area[i].ffile = 0;
   }
 
+  // set mmap stack
+  p->mmap_sp = TRAPFRAME;
+
   return p;
 }
 

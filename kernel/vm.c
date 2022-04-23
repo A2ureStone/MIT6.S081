@@ -4,7 +4,6 @@
 #include "elf.h"
 #include "riscv.h"
 #include "defs.h"
-#include "fs.h"
 
 /*
  * the kernel's page table.
@@ -45,7 +44,7 @@ kvmmake(void)
 
   // map kernel stacks
   proc_mapstacks(kpgtbl);
-  
+
   return kpgtbl;
 }
 
@@ -330,7 +329,7 @@ void
 uvmclear(pagetable_t pagetable, uint64 va)
 {
   pte_t *pte;
-  
+
   pte = walk(pagetable, va, 0);
   if(pte == 0)
     panic("uvmclear");
