@@ -9,7 +9,7 @@ int main(int argc, char *argv[])
     pipe(p);
     mainread[1] = p[1];
     mainread[0] = p[0];
-    for (int i = 2; i < 36; i++)
+    for (int i = 2; i < 130; i++)
     {
         char *num = (char *)&i;
         write(p[1], num, 4);
@@ -17,41 +17,42 @@ int main(int argc, char *argv[])
     }
 
     int prime;
-    while (1)
-    {
-        close(mainread[1]);
-        // close write end
-        if (read(mainread[0], &prime, 4) > 0)
-        {
-            pipe(p);
-            if (fork() == 0)
-            {
-                int num;
-                printf("prime %d\n", prime);
-                while (read(mainread[0], &num, 4) > 0) {
-                    if (num % prime != 0) {
-                        write(p[1], &num, 4);
-                        // if not divive, write to new pipe
-                    }
-                }
-                close(p[0]);
-                close(p[1]);
-                close(mainread[0]);
-                exit(0);
-            }
+    int num;
+    close(mainread[1]);
+    while (1) {
+
+        // read from the pipe success, else just return
+        if (read(mainread[0], &prime, 4) == 0) {
+            exit(0);
+        }
+
+        printf("prime %d\n", prime);
+        pipe(p);
+        if (fork() == 0) {
+            // do nothing except for change the mainread, in the next round,
+            // child process become parent process
             close(mainread[0]);
-            // close main process pipeline
-            mainread[1] = p[1];
             mainread[0] = p[0];
-            // change mainread to the new open pipe
+            close(p[1]);
         } else {
+            // close read side of the new pipe
+            close(p[0]);
+            // get and write to the pipe
+            ;
+            while (read(mainread[0], &num, 4) > 0) {
+                if (num % prime != 0) {
+                    write(p[1], &num, 4);
+                }
+            }
+            close(p[1]);
             close(mainread[0]);
-            break;
+
+            // wait for the child
+            while(wait(0) != -1) {
+                ;
+            }
+            exit(0);
+            // finish write, wait for child
         }
     }
-    while (wait(0) != -1) {
-        ;
-        // make sure all child exit
-    }
-    exit(0);
 }
