@@ -21,26 +21,21 @@ int main(int argc, char *argv[])
     {
         close(mainread[1]);
         // close write end
-        if (read(mainread[0], &prime, 4) > 0) 
+        if (read(mainread[0], &prime, 4) > 0)
         {
             pipe(p);
             if (fork() == 0)
             {
                 int num;
                 printf("prime %d\n", prime);
-                int onlyOne = 1;
                 while (read(mainread[0], &num, 4) > 0) {
-                    onlyOne = 0;
                     if (num % prime != 0) {
                         write(p[1], &num, 4);
                         // if not divive, write to new pipe
                     }
                 }
-                if (onlyOne) {
-                    close(p[1]);
-                    close(p[0]);
-                    // if only one elem, close the write end
-                }
+                close(p[0]);
+                close(p[1]);
                 close(mainread[0]);
                 exit(0);
             }
